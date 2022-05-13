@@ -11,6 +11,7 @@
 #include <string>
 #include <memory>
 #include "esp_event_cxx.hpp"
+#include "esp_event_api.hpp"
 
 struct MqttClientHandle;
 
