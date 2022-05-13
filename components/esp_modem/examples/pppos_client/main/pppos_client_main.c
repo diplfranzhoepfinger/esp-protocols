@@ -150,6 +150,12 @@ void app_main(void)
 #elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM800 == 1
     ESP_LOGI(TAG, "Initializing esp_modem for the SIM800 module...");
     esp_modem_dce_t *dce = esp_modem_new_dev(ESP_MODEM_DCE_SIM800, &dte_config, &dce_config, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7000 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM7000 module...");
+    esp_modem_dce_t *dce = esp_modem_new_dev(ESP_MODEM_DCE_SIM7000, &dte_config, &dce_config, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7070 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM7070 module...");
+    esp_modem_dce_t *dce = esp_modem_new_dev(ESP_MODEM_DCE_SIM7070, &dte_config, &dce_config, esp_netif);
 #elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7600 == 1
     ESP_LOGI(TAG, "Initializing esp_modem for the SIM7600 module...");
     esp_modem_dce_t *dce = esp_modem_new_dev(ESP_MODEM_DCE_SIM7600, &dte_config, &dce_config, esp_netif);

@@ -65,7 +65,30 @@ extern "C" void app_main(void)
 #if defined(CONFIG_EXAMPLE_SERIAL_CONFIG_UART)
     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
     auto uart_dte = create_uart_dte(&dte_config);
+	
+#if CONFIG_EXAMPLE_MODEM_DEVICE_SHINY == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SHINY module...");
     auto dce = create_shiny_dce(&dce_config, uart_dte, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_BG96 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the BG96 module...");
+    auto dce = create_BG96_dce(&dce_config, uart_dte, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM800 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM800 module...");
+    auto dce = create_SIM800_dce(&dce_config, uart_dte, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7000 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM7000 module...");
+    auto dce = create_SIM7000_dce(&dce_config, uart_dte, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7070 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM7070 module...");
+    auto dce = create_SIM7070_dce(&dce_config, uart_dte, esp_netif);
+#elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7600 == 1
+    ESP_LOGI(TAG, "Initializing esp_modem for the SIM7600 module...");
+    auto dce = create_SIM7600_dce(&dce_config, uart_dte, esp_netif);
+#else
+    ESP_LOGI(TAG, "Initializing esp_modem for a generic module...");
+    auto dce = create_generic_dce(&dce_config, uart_dte, esp_netif);
+#endif
+
 
 #elif defined(CONFIG_EXAMPLE_SERIAL_CONFIG_USB)
     struct esp_modem_usb_term_config usb_config = ESP_MODEM_DEFAULT_USB_CONFIG(0x2C7C, 0x0296); // VID and PID of BG96 modem

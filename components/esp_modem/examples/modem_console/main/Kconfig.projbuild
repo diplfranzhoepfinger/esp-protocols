@@ -14,4 +14,37 @@ menu "Example Configuration"
             help
                 Connect to modem via USB (CDC-ACM class). For IDF version >= 4.4.
     endchoice
+
+    choice EXAMPLE_MODEM_DEVICE
+        prompt "Choose supported modem device (DCE)"
+        default EXAMPLE_MODEM_DEVICE_BG96
+        help
+            Select modem device connected to the ESP DTE.
+        config EXAMPLE_MODEM_DEVICE_SHINY
+            bool "SHINY"
+            help
+                SHINY is a GSM/GPRS module.
+                It supports SHINY.
+        config EXAMPLE_MODEM_DEVICE_SIM800
+            bool "SIM800"
+            help
+                SIMCom SIM800L is a GSM/GPRS module.
+                It supports Quad-band 850/900/1800/1900MHz.
+        config EXAMPLE_MODEM_DEVICE_BG96
+            bool "BG96"
+            help
+                Quectel BG96 is a series of LTE Cat M1/Cat NB1/EGPRS module.
+        config EXAMPLE_MODEM_DEVICE_SIM7000
+            bool "SIM7000"
+            help
+                SIM7000 is Multi-Band xxxxxxxxxxxxxxxxx
+        config EXAMPLE_MODEM_DEVICE_SIM7070
+            bool "SIM7070"
+            help
+                SIM7070 is Multi-Band xxxxxxxxxxxxxxxxx
+        config EXAMPLE_MODEM_DEVICE_SIM7600
+            bool "SIM7600"
+            help
+                SIM7600 is a Multi-Band LTE-TDD/LTE-FDD/HSPA+ and GSM/GPRS/EDGE module.
+    endchoice
 endmenu
