@@ -15,13 +15,17 @@ void LoopbackTerm::stop()
 
 int LoopbackTerm::write(uint8_t *data, size_t len)
 {
+    if (inject_by) {    // injection test: ignore what we write, but respond with injected data
+        auto ret = std::async(&LoopbackTerm::batch_read, this);
+        return len;
+    }
     if (len > 2 && (data[len - 1] == '\r' || data[len - 1] == '+') ) { // Simple AT responder
         std::string command((char *)data, len);
         std::string response;
         if (command == "+++") {
             response = "NO CARRIER\r\n";
         } else if (command == "ATE1\r" || command == "ATE0\r") {
-            response = "OK\r\n";
+            response = "OK\r\n ";
         } else if (command == "ATO\r") {
             response = "ERROR\r\n";
         } else if (command.find("ATD") != std::string::npos) {
@@ -39,7 +43,16 @@ int LoopbackTerm::write(uint8_t *data, size_t len)
         } else if (command.find("AT+CPIN?\r") != std::string::npos) {
             response = pin_ok ? "+CPIN: READY\r\nOK\r\n" : "+CPIN: SIM PIN\r\nOK\r\n";
         } else if (command.find("AT") != std::string::npos) {
-            response = "OK\r\n";
+            if (command.length() > 4) {
+                response = command;
+                response[0] = 'O';
+                response[1] = 'K';
+                response[2] = '\r';
+                response[3] = '\n';
+            } else {
+                response = "OK\r\n";
+            }
+
         }
         if (!response.empty()) {
             data_len = response.length();
@@ -51,7 +64,7 @@ int LoopbackTerm::write(uint8_t *data, size_t len)
     }
     if (len > 2 && data[0] == 0xf9) { // Simple CMUX responder
         // turn the request into a reply -> implements CMUX loopback
-        if (data[2] == 0x3f) {  // SABM command
+        if (data[2] == 0x3f || data[2] == 0x53) {  // SABM command
             data[2] = 0x73;
         } else if (data[2] == 0xef) { // Generic request
             data[2] = 0xff;         // generic reply
@@ -67,6 +80,8 @@ int LoopbackTerm::write(uint8_t *data, size_t len)
 int LoopbackTerm::read(uint8_t *data, size_t len)
 {
     size_t read_len = std::min(data_len, len);
+    if (inject_by && read_len > inject_by)
+        read_len = inject_by;
     if (read_len) {
         if (loopback_data.capacity() < len) {
             loopback_data.reserve(len);
@@ -78,8 +93,30 @@ int LoopbackTerm::read(uint8_t *data, size_t len)
     return read_len;
 }
 
-LoopbackTerm::LoopbackTerm(bool is_bg96): loopback_data(), data_len(0), pin_ok(false), is_bg96(is_bg96) {}
+LoopbackTerm::LoopbackTerm(bool is_bg96): loopback_data(), data_len(0), pin_ok(false), is_bg96(is_bg96), inject_by(0) {}
 
-LoopbackTerm::LoopbackTerm(): loopback_data(), data_len(0), pin_ok(false), is_bg96(false) {}
+LoopbackTerm::LoopbackTerm(): loopback_data(), data_len(0), pin_ok(false), is_bg96(false), inject_by(0) {}
+
+int LoopbackTerm::inject(uint8_t *data, size_t len, size_t injected_by)
+{
+    if (data == nullptr) {
+        inject_by = 0;
+        return 0;
+    }
+
+    loopback_data.resize(len);
+    memcpy(&loopback_data[0], data, len);
+    data_len = len;
+    inject_by = injected_by;
+    return len;
+}
+
+void LoopbackTerm::batch_read()
+{
+    while (data_len > 0) {
+        on_read(nullptr, std::min(inject_by, data_len));
+        Task::Delay(1);
+    }
+}
 
 LoopbackTerm::~LoopbackTerm() = default;
