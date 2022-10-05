@@ -51,7 +51,9 @@ public:
      * @param len Data len to write
      * @return number of bytes written
      */
-    int write(uint8_t *data, size_t len);
+    int write(uint8_t *data, size_t len) override;
+
+    int write_cmd(uint8_t *data, size_t len);
 
     /**
      * @brief Reading from the underlying terminal
@@ -66,6 +68,8 @@ public:
      * @param f Function to be called on data available
      */
     void set_read_cb(std::function<bool(uint8_t *data, size_t len)> f);
+
+    void on_read(got_line_cb on_data) override;
 
     /**
      * @brief Sets DTE error callback

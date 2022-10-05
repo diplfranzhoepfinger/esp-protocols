@@ -23,6 +23,14 @@ namespace dce_commands {
  */
 
 /**
+ * @brief Make some generic AT commands and getters public
+ */
+command_result generic_get_string(CommandableIf *t, const std::string &command, std::string_view &output, uint32_t timeout_ms = 500);
+command_result generic_command(CommandableIf *t, const std::string &command,
+                               const std::string &pass_phrase,
+                               const std::string &fail_phrase, uint32_t timeout_ms);
+
+/**
  * @brief Declaration of all commands is generated from esp_modem_command_declare.inc
  */
 #define ESP_MODEM_DECLARE_DCE_COMMAND(name, return_type, num, ...) \

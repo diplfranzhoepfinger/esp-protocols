@@ -192,6 +192,34 @@ int DTE::write(uint8_t *data, size_t len)
     return secondary_term->write(data, len);
 }
 
+int DTE::write_cmd(uint8_t *data, size_t len)
+{
+    return command_term->write(data, len);
+}
+
+void DTE::on_read(got_line_cb on_read_cb)
+{
+    if (on_read_cb == nullptr) {
+        command_term->set_read_cb(nullptr);
+        internal_lock.unlock();
+        return;
+    }
+    internal_lock.lock();
+    command_term->set_read_cb([this, on_read_cb](uint8_t *data, size_t len) {
+        if (!data) {
+            data = buffer.get();
+            len = command_term->read(data, buffer.size);
+        }
+        auto res = on_read_cb(data, len);
+        if (res == command_result::OK || res == command_result::FAIL) {
+            command_term->set_read_cb(nullptr);
+            internal_lock.unlock();
+            return true;
+        }
+        return false;
+    });
+}
+
 /**
  * Implemented here to keep all headers C++11 compliant
  */
