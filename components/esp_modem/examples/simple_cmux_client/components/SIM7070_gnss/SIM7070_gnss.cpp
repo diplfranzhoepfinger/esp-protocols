@@ -72,25 +72,20 @@ esp_modem::command_result get_gnss_information_sim70xx_lib_once(esp_modem::Comma
 		return esp_modem::command_result::FAIL;
 	}
 	/**
-	 * Parsing +CGNSINF:
-	 * <GNSS run status>,
-	 * <Fix status>,
-	 * <UTC date &  Time>,
+	 * Parsing +SGNSCMD:
+	 * <GNSS mode>,
+	 * <UTC date>,
+	 * <Total number of satellites>
+	 * <UTC Time>,
 	 * <Latitude>,
 	 * <Longitude>,
+	 * <MSL Accuracy>,
 	 * <MSL Altitude>,
+	 * <MSL Altitude sea level>,
 	 * <Speed Over Ground>,
 	 * <Course Over Ground>,
-	 * <Fix Mode>,
-	 * <Reserved1>,
-	 * <HDOP>,
-	 * <PDOP>,
-	 * <VDOP>,
-	 * <Reserved2>,
-	 * <GNSS Satellites in View>,
-	 * <Reserved3>,
-	 * <HPA>,
-	 * <VPA>
+	 * <Time Stamp>,
+	 * <Flag>,
 	 */
 	out = out.substr(pattern.size());
 	int pos = 0;
