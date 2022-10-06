@@ -608,9 +608,19 @@ esp_modem::command_result get_gnss_information_sim70xx_lib(esp_modem::Commandabl
 	return esp_modem::command_result::OK;
 }
 
+esp_modem::command_result SIM7070_gnss::get_gnss_information_sim70xx_once(gps_t &gps)
+{
+    return get_gnss_information_sim70xx_lib_once(dte.get(), gps);
+}
+
 esp_modem::command_result SIM7070_gnss::get_gnss_information_sim70xx(gps_t &gps)
 {
     return get_gnss_information_sim70xx_lib(dte.get(), gps);
+}
+
+esp_modem::command_result DCE_gnss::get_gnss_information_sim70xx_once(gps_t &gps)
+{
+    return device->get_gnss_information_sim70xx_once(gps);
 }
 
 esp_modem::command_result DCE_gnss::get_gnss_information_sim70xx(gps_t &gps)
