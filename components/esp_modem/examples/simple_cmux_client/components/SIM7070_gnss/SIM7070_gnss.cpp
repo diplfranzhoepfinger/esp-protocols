@@ -92,7 +92,7 @@ esp_modem::command_result get_gnss_information_sim70xx_lib_once(esp_modem::Comma
 	if ((pos = out.find(',')) == std::string::npos) {
 		return esp_modem::command_result::FAIL;
 	}
-	//GNSS run status
+	//GNSS mode
 	int GNSS_run_status;
 	if (std::from_chars(out.data(), out.data() + pos, GNSS_run_status).ec == std::errc::invalid_argument) {
 		return esp_modem::command_result::FAIL;
@@ -102,28 +102,10 @@ esp_modem::command_result get_gnss_information_sim70xx_lib_once(esp_modem::Comma
 	if ((pos = out.find(',')) == std::string::npos) {
 		return esp_modem::command_result::FAIL;
 	}
-	//Fix status
+	//UTC date
 	{
-		std::string_view fix_status = out.substr(0 , pos);
-		if (fix_status.length() > 1)
-		{
-			int Fix_status;
-			if (std::from_chars(out.data(), out.data() + pos, Fix_status).ec == std::errc::invalid_argument) {
-				return esp_modem::command_result::FAIL;
-			}
-			gps.fix = (gps_fix_t)Fix_status;
-		}
-		else
-			gps.fix  = GPS_FIX_INVALID;
-	} //clean up Fix status
-	out = out.substr(pos + 1);
-	if ((pos = out.find(',')) == std::string::npos) {
-		return esp_modem::command_result::FAIL;
-	}
-	//UTC date &  Time
-	{
-		std::string_view UTC_date_and_Time = out.substr(0 , pos);
-		if (UTC_date_and_Time.length() > 1)
+		std::string_view UTC_date = out.substr(0 , pos);
+		if (UTC_date.length() > 1)
 		{
 			if (std::from_chars(out.data() + 0, out.data() + 4, gps.date.year).ec == std::errc::invalid_argument) {
 				return esp_modem::command_result::FAIL;
@@ -134,31 +116,63 @@ esp_modem::command_result get_gnss_information_sim70xx_lib_once(esp_modem::Comma
 			if (std::from_chars(out.data() + 6, out.data() + 8, gps.date.day).ec == std::errc::invalid_argument) {
 				return esp_modem::command_result::FAIL;
 			}
-			if (std::from_chars(out.data() + 8, out.data() + 10, gps.tim.hour).ec == std::errc::invalid_argument) {
-				return esp_modem::command_result::FAIL;
-			}
-			if (std::from_chars(out.data() + 10, out.data() + 12, gps.tim.minute).ec == std::errc::invalid_argument) {
-				return esp_modem::command_result::FAIL;
-			}
-			if (std::from_chars(out.data() + 12, out.data() + 14, gps.tim.second).ec == std::errc::invalid_argument) {
-				return esp_modem::command_result::FAIL;
-			}
-			if (std::from_chars(out.data() + 15, out.data() + 18, gps.tim.thousand).ec == std::errc::invalid_argument) {
-				return esp_modem::command_result::FAIL;
-			}
 		}
 		else
 		{
 			gps.date.year    = 0;
 			gps.date.month   = 0;
 			gps.date.day     = 0;
+		}
+
+	} //clean up UTC date
+	out = out.substr(pos + 1);
+	if ((pos = out.find(',')) == std::string::npos) {
+		return esp_modem::command_result::FAIL;
+	}
+	//Total number of satellites
+	{
+		std::string_view sats_in_view = out.substr(0 , pos);
+		if (sats_in_view.length() > 1)
+		{
+			if (std::from_chars(out.data(), out.data() + pos, gps.sats_in_view).ec == std::errc::invalid_argument) {
+				return esp_modem::command_result::FAIL;
+			}
+		}
+		else
+			gps.sats_in_view  = 0;
+	} //clean Total number of satellites
+
+	out = out.substr(pos + 1);
+	if ((pos = out.find(',')) == std::string::npos) {
+		return esp_modem::command_result::FAIL;
+	}
+	//UTC Time
+	{
+		std::string_view UTC_Time = out.substr(0 , pos);
+		if (UTC_Time.length() > 1)
+		{
+			if (std::from_chars(out.data() + 8, out.data() + 2, gps.tim.hour).ec == std::errc::invalid_argument) {
+				return esp_modem::command_result::FAIL;
+			}
+			if (std::from_chars(out.data() + 10, out.data() + 4, gps.tim.minute).ec == std::errc::invalid_argument) {
+				return esp_modem::command_result::FAIL;
+			}
+			if (std::from_chars(out.data() + 12, out.data() + 6, gps.tim.second).ec == std::errc::invalid_argument) {
+				return esp_modem::command_result::FAIL;
+			}
+			if (std::from_chars(out.data() + 15, out.data() + 8, gps.tim.thousand).ec == std::errc::invalid_argument) {
+				return esp_modem::command_result::FAIL;
+			}
+		}
+		else
+		{
 			gps.tim.hour     = 0;
 			gps.tim.minute   = 0;
 			gps.tim.second   = 0;
 			gps.tim.thousand = 0;
 		}
 
-	} //clean up UTC date &  Time
+	} //clean up UTC Time
 	out = out.substr(pos + 1);
 	if ((pos = out.find(',')) == std::string::npos) {
 		return esp_modem::command_result::FAIL;
