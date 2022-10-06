@@ -31,6 +31,7 @@ class SIM7070_gnss: public esp_modem::SIM7070 {
     using SIM7070::SIM7070;
 public:
     esp_modem::command_result get_gnss_information_sim70xx(gps_t& gps);
+    esp_modem::command_result get_gnss_information_sim70xx_once(gps_t& gps);
 };
 
 class DCE_gnss : public esp_modem::DCE_T<SIM7070_gnss> {
