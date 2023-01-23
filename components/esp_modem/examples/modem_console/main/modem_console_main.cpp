@@ -348,6 +348,7 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "Resetting the module...");
         CHECK_ERR(dce->reset(), ESP_LOGI(TAG, "OK"));
     });
+#if CONFIG_EXAMPLE_MODEM_DEVICE_SHINY == 1
     const ConsoleCommand HandleURC("urc", "toggle urc handling", no_args, [&](ConsoleCommand * c) {
         static int cnt = 0;
         if (++cnt % 2) {
@@ -359,6 +360,7 @@ extern "C" void app_main(void)
         }
         return 0;
     });
+#endif
 
     const struct SetApn {
         SetApn(): apn(STR1, nullptr, nullptr, "<apn>", "APN (Access Point Name)") {}
