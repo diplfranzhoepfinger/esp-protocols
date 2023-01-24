@@ -129,64 +129,97 @@ void DCE::forwarding(uint8_t *data, size_t len)
         dte->write(&ctrl_z, 1);
         state = status::SENDING_1;
         return;
-    } else if (state == status::RECEIVING) {
-        const size_t MIN_MESSAGE = 6;
-        const std::string_view head = "+CIPRXGET: 2,0,";
-        auto head_pos = (char *)std::search(data, data + len, head.begin(), head.end());
-        if (head_pos == nullptr) {
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
-            return;
-        }
-        if (head_pos - (char *)data > MIN_MESSAGE) {
-            // check for async replies before the Recv header
-            std::string_view response((char *)data, head_pos - (char *)data);
-            check_async_replies(response);
-        }
+    } else if (state == status::RECEIVING || state == status::RECEIVING_1 ) {
+        const int MIN_MESSAGE = 6;
+        size_t actual_len = 0;
+        char *recv_data = (char *)data;
+        if (data_to_recv == 0) {
+            const std::string_view head = "+CIPRXGET: 2,0,";
+            auto head_pos = (char *)std::search(data, data + len, head.begin(), head.end());
+            if (head_pos == nullptr) {
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
+            if (head_pos - (char *)data > MIN_MESSAGE) {
+                // check for async replies before the Recv header
+                std::string_view response((char *)data, head_pos - (char *)data);
+                check_async_replies(response);
+            }
 
-        auto next_comma = (char *)memchr(head_pos + head.size(), ',', MIN_MESSAGE);
-        if (next_comma == nullptr)  {
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
-            return;
-        }
-        size_t actual_len;
-        if (std::from_chars(head_pos + head.size(), next_comma, actual_len).ec == std::errc::invalid_argument) {
-            ESP_LOGE(TAG, "cannot convert");
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
-            return;
-        }
+            auto next_comma = (char *)memchr(head_pos + head.size(), ',', MIN_MESSAGE);
+            if (next_comma == nullptr)  {
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
+            if (std::from_chars(head_pos + head.size(), next_comma, actual_len).ec == std::errc::invalid_argument) {
+                ESP_LOGE(TAG, "cannot convert");
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
 
-        ESP_LOGD(TAG, "Received: actual len=%d", actual_len);
-
-        auto next_nl = (char *)memchr(next_comma, '\n', MIN_MESSAGE);
-        if (next_nl == nullptr) {
-            ESP_LOGE(TAG, "not found");
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
+            auto next_nl = (char *)memchr(next_comma, '\n', 8 /* total_len size (~4) + markers */);
+            if (next_nl == nullptr) {
+                ESP_LOGE(TAG, "not found");
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
+            if (actual_len > size) {
+                ESP_LOGE(TAG, "TOO BIG");
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
+            size_t total_len = 0;
+            if (std::from_chars(next_comma + 1, next_nl - 1, total_len).ec == std::errc::invalid_argument) {
+                ESP_LOGE(TAG, "cannot convert");
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                return;
+            }
+            read_again = (total_len > 0);
+            recv_data = next_nl + 1;
+            auto first_data_len = len - (recv_data - (char *)data) /* minus size of the command marker */;
+            if (actual_len > first_data_len) {
+                ::send(sock, recv_data, first_data_len, 0);
+                state = status::RECEIVING_1;
+                data_to_recv = actual_len - first_data_len;
+                return;
+            }
+            ::send(sock, recv_data, actual_len, 0);
+        } else if (data_to_recv > len) {    // continue sending
+            ::send(sock, recv_data, len, 0);
+            data_to_recv -= len;
             return;
+        } else if (data_to_recv <= len) {    // last read -> looking for "OK" marker
+            ::send(sock, recv_data, data_to_recv, 0);
+            actual_len = data_to_recv;
         }
-        if (actual_len > size) {
-            ESP_LOGE(TAG, "TOO BIG");
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
-            return;
-        }
-        ::send(sock, next_nl + 1, actual_len, 0);
 
         // "OK" after the data
-        auto last_pos = (char *)memchr(next_nl + 1 + actual_len, 'O', MIN_MESSAGE);
-        if (last_pos == nullptr || last_pos[1] != 'K') {
-            state = status::RECEIVING_FAILED;
-            signal.set(IDLE);
+        char *last_pos = nullptr;
+        if (actual_len + 1 + 2 /* OK */  > len) {
+            last_pos = (char *)memchr(recv_data + 1 + actual_len, 'O', MIN_MESSAGE);
+            if (last_pos == nullptr || last_pos[1] != 'K') {
+                state = status::RECEIVING_FAILED;
+                signal.set(IDLE);
+                data_to_recv = 0;
+            }
+        }
+        if (last_pos != nullptr && (char *)data + len - last_pos > MIN_MESSAGE) {
+            // check for async replies after the Recv header
+            std::string_view response((char *)last_pos + 2 /* OK */, (char *)data + len - last_pos - 2);
+            check_async_replies(response);
         }
         state = status::IDLE;
         signal.set(IDLE);
-        if ((char *)data + len - last_pos > MIN_MESSAGE) {
-            // check for async replies after the Recv header
-            std::string_view response((char *)last_pos + 2 /* OK */, (char *)data + len - last_pos);
-            check_async_replies(response);
+        data_to_recv = 0;
+        if (read_again) {
+            uint64_t data_ready = 1;
+            write(data_ready_fd, &data_ready, sizeof(data_ready));
         }
         return;
     }

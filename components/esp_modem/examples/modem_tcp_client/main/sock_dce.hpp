@@ -54,13 +54,16 @@ private:
         SENDING_1,
         SENDING_FAILED,
         RECEIVING,
+        RECEIVING_1,
         RECEIVING_FAILED
     };
     status state{status::IDLE};
     static constexpr uint8_t IDLE = 1;
-    static constexpr uint8_t size = 100;
+    static constexpr size_t size = 512;
     std::array<uint8_t, size> buffer;
     size_t data_to_send = 0;
+    size_t data_to_recv = 0;
+    bool read_again = false;
     int sock {-1};
     int listen_sock {-1};
     int data_ready_fd {-1};
