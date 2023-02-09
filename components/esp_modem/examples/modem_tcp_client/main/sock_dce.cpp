@@ -134,7 +134,7 @@ void DCE::forwarding(uint8_t *data, size_t len)
         size_t actual_len = 0;
         char *recv_data = (char *)data;
         if (data_to_recv == 0) {
-            const std::string_view head = "+CIPRXGET: 2,0,";
+            static constexpr std::string_view head = "+CIPRXGET: 2,0,";
             auto head_pos = (char *)std::search(data, data + len, head.begin(), head.end());
             if (head_pos == nullptr) {
                 state = status::RECEIVING_FAILED;
