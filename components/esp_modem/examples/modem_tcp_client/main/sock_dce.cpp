@@ -13,7 +13,7 @@
 
 namespace sock_dce {
 
-static const char *TAG = "sock_dce";
+static constexpr char *TAG = "sock_dce";
 
 
 bool DCE::perform()
