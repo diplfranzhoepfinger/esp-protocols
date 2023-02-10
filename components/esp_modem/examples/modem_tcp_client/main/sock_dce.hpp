@@ -14,6 +14,31 @@
 
 namespace sock_dce {
 
+static constexpr size_t size = 512;
+
+class Listener {
+public:
+    enum class state {
+        OK, FAIL, IN_PROGRESS
+    };
+    Listener(std::array<uint8_t, size> &b, int &s, int &ready_fd, std::shared_ptr<esp_modem::DTE> &dte_arg):
+        buffer(b), sock(s), data_ready_fd(ready_fd), dte(dte_arg) {}
+    state recv(uint8_t *data, size_t len);
+    state send(uint8_t *data, size_t len);
+    state send(std::string_view response);
+    state connect(std::string_view response);
+    void check_async_replies(std::string_view &response) const;
+private:
+    std::array<uint8_t, size> &buffer;
+    size_t data_to_recv = 0;
+    bool read_again = false;
+    int &sock;
+    int &data_ready_fd;
+    int send_stat = 0;
+    size_t data_to_send = 0;
+    std::shared_ptr<esp_modem::DTE> &dte;
+};
+
 class DCE : public ::esp_modem::GenericModule {
     using esp_modem::GenericModule::GenericModule;
 public:
@@ -42,7 +67,7 @@ private:
 
     void forwarding(uint8_t *data, size_t len);
 
-    void check_async_replies(std::string_view &response) const;
+//    void check_async_replies(std::string_view &response) const;
 
     void send_cmd(std::string_view command)
     {
@@ -62,10 +87,10 @@ private:
     };
     status state{status::IDLE};
     static constexpr uint8_t IDLE = 1;
-    static constexpr size_t size = 512;
     std::array<uint8_t, size> buffer;
+    Listener at{buffer, sock, data_ready_fd, dte};
     size_t data_to_send = 0;
-    size_t data_to_recv = 0;
+//    size_t data_to_recv = 0;
     bool read_again = false;
     int sock {-1};
     int listen_sock {-1};
