@@ -23,9 +23,14 @@ namespace dce_commands {
  */
 
 /**
- * @brief Make some generic AT commands and getters public
+ * @brief Generic AT command to be send with pass and fail phrases
+ *
+ * @param t Commandable object (anything that can accept commands)
+ * @param command Command to be sent do the commandable object
+ * @param pass_phrase String to be present in the reply to pass this command
+ * @param fail_phrase String to be present in the reply to fail this command
+ * @param timeout_ms Timeout in ms
  */
-command_result generic_get_string(CommandableIf *t, const std::string &command, std::string_view &output, uint32_t timeout_ms = 500);
 command_result generic_command(CommandableIf *t, const std::string &command,
                                const std::string &pass_phrase,
                                const std::string &fail_phrase, uint32_t timeout_ms);

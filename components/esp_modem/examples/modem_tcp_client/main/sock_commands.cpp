@@ -7,6 +7,7 @@
 #include <charconv>
 #include <cstring>
 #include "sock_commands.hpp"
+#include "cxx_include/esp_modem_command_library_utils.hpp"
 
 namespace sock_commands {
 
@@ -14,42 +15,42 @@ static const char *TAG = "sock_commands";
 
 using namespace esp_modem;
 
-command_result net_open(CommandableIf *t)
+command_result net_open(CommandableIf *term)
 {
     ESP_LOGV(TAG, "%s", __func__ );
-    std::string_view out;
-    auto ret = dce_commands::generic_get_string(t, "AT+NETOPEN?\r", out, 1000);
+    std::string response;
+    auto ret = dce_commands::generic_get_string(term, "AT+NETOPEN?\r", response, 1000);
     if (ret != command_result::OK) {
         return ret;
     }
-    ESP_LOGV(TAG, "%s", out.data() );
-    if (out.find("+NETOPEN: 1") != std::string::npos) {
+    ESP_LOGV(TAG, "%s", response.data() );
+    if (response.find("+NETOPEN: 1") != std::string::npos) {
         ESP_LOGD(TAG, "Already there");
         return command_result::OK;
-    } else if (out.find("+NETOPEN: 0") != std::string::npos) {
+    } else if (response.find("+NETOPEN: 0") != std::string::npos) {
         ESP_LOGD(TAG, "Need to setup");
-        return dce_commands::generic_command(t, "AT+NETOPEN\r", "+NETOPEN: 1", "+NETOPEN: 0", 10000);
+        return dce_commands::generic_command(term, "AT+NETOPEN\r", "+NETOPEN: 1", "+NETOPEN: 0", 10000);
     }
     return command_result::FAIL;
 }
 
-command_result net_close(CommandableIf *t)
+command_result net_close(CommandableIf *term)
 {
     ESP_LOGV(TAG, "%s", __func__ );
-    return dce_commands::generic_command(t, "AT+NETCLOSE\r", "+NETCLOSE:", "ERROR", 30000);
+    return dce_commands::generic_command(term, "AT+NETCLOSE\r", "+NETCLOSE:", "ERROR", 30000);
 }
 
-command_result tcp_open(CommandableIf *t, const std::string &host, int port, int timeout)
+command_result tcp_open(CommandableIf *term, const std::string &host, int port, int timeout)
 {
     ESP_LOGV(TAG, "%s", __func__ );
-    auto ret = dce_commands::generic_command(t, "AT+CIPRXGET=1\r", "OK", "ERROR", 50000);
+    auto ret = dce_commands::generic_command(term, "AT+CIPRXGET=1\r", "OK", "ERROR", 50000);
     if (ret != command_result::OK) {
         ESP_LOGE(TAG, "Setting Rx mode failed!");
         return ret;
     }
     ESP_LOGV(TAG, "%s", __func__ );
     std::string ip_open = R"(AT+CIPOPEN=0,"TCP",")" + host + "\"," + std::to_string(port) + "\r";
-    ret = dce_commands::generic_command(t, ip_open, "+CIPOPEN: 0,0", "ERROR", timeout);
+    ret = dce_commands::generic_command(term, ip_open, "+CIPOPEN: 0,0", "ERROR", timeout);
     if (ret != command_result::OK) {
         ESP_LOGE(TAG, "%s Failed", __func__ );
         return ret;
@@ -57,17 +58,17 @@ command_result tcp_open(CommandableIf *t, const std::string &host, int port, int
     return command_result::OK;
 }
 
-command_result tcp_close(CommandableIf *t)
+command_result tcp_close(CommandableIf *term)
 {
     ESP_LOGV(TAG, "%s", __func__ );
-    return dce_commands::generic_command(t, "AT+CIPCLOSE=0\r", "+CIPCLOSE:", "ERROR", 10000);
+    return dce_commands::generic_command(term, "AT+CIPCLOSE=0\r", "+CIPCLOSE:", "ERROR", 10000);
 }
 
-command_result tcp_send(CommandableIf *t, uint8_t *data, size_t len)
+command_result tcp_send(CommandableIf *term, uint8_t *data, size_t len)
 {
     ESP_LOGV(TAG, "%s", __func__ );
     std::string send = "AT+CIPSEND=0," + std::to_string(len) + "\r";
-    auto ret = t->command(send, [&](uint8_t *data, size_t len) {
+    auto ret = term->command(send, [&](uint8_t *data, size_t len) {
         std::string_view response((char *)data, len);
         ESP_LOGI(TAG, "CIPSEND response %.*s", static_cast<int>(response.size()), response.data());
         if (response.find('>') != std::string::npos) {
@@ -80,7 +81,7 @@ command_result tcp_send(CommandableIf *t, uint8_t *data, size_t len)
     }
     ret = command_result::TIMEOUT;
     ESP_LOGW(TAG, "Before setting...");
-    t->on_read([&ret](uint8_t *cmd_data, size_t cmd_len) {
+    term->on_read([&ret](uint8_t *cmd_data, size_t cmd_len) {
         std::string_view response((char *)cmd_data, cmd_len);
         ESP_LOGW(TAG, "CIPSEND response %.*s", static_cast<int>(response.size()), response.data());
 
@@ -92,26 +93,26 @@ command_result tcp_send(CommandableIf *t, uint8_t *data, size_t len)
         return ret;
     });
     ESP_LOGW(TAG, "Before writing...");
-    auto written = t->write(data, len);
+    auto written = term->write(data, len);
     if (written != len) {
         ESP_LOGE(TAG, "written %d (%d)...", written, len);
         return command_result::FAIL;
     }
     uint8_t ctrl_z = '\x1A';
-    t->write(&ctrl_z, 1);
+    term->write(&ctrl_z, 1);
     int count = 0;
     while (ret == command_result::TIMEOUT && count++ < 1000 ) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-    t->on_read(nullptr);
+    term->on_read(nullptr);
     return ret;
 }
 
-command_result tcp_recv(CommandableIf *t, uint8_t *data, size_t len, size_t &out_len)
+command_result tcp_recv(CommandableIf *term, uint8_t *data, size_t len, size_t &out_len)
 {
     ESP_LOGV(TAG, "%s", __func__ );
-    std::string_view out;
-    auto ret = dce_commands::generic_get_string(t, "AT+CIPRXGET=4,0\r", out);
+    std::string out;
+    auto ret = dce_commands::generic_get_string(term, "AT+CIPRXGET=4,0\r", out);
     if (ret != command_result::OK) {
         return ret;
     }
@@ -129,7 +130,7 @@ command_result tcp_recv(CommandableIf *t, uint8_t *data, size_t len, size_t &out
         out_len = data_len;
         return command_result::OK;
     }
-    return t->command("AT+CIPRXGET=2,0,100\r", [&](uint8_t *cmd_data, size_t cmd_len) {
+    return term->command("AT+CIPRXGET=2,0,100\r", [&](uint8_t *cmd_data, size_t cmd_len) {
         char pattern[] = "+CIPRXGET: 2,0,";
         ESP_LOG_BUFFER_HEXDUMP(TAG, cmd_data, cmd_len, ESP_LOG_DEBUG);
         char *pos = strstr((char *)cmd_data, pattern);
@@ -164,10 +165,10 @@ command_result tcp_recv(CommandableIf *t, uint8_t *data, size_t len, size_t &out
     }, 50000);
 }
 
-command_result get_ip(CommandableIf *t, std::string &ip)
+command_result get_ip(CommandableIf *term, std::string &ip)
 {
-    std::string_view resp;
-    auto ret = dce_commands::generic_get_string(t, "AT+IPADDR\r", resp, 5000);
+    std::string resp;
+    auto ret = dce_commands::generic_get_string(term, "AT+IPADDR\r", resp, 5000);
     if (ret != command_result::OK) {
         return ret;
     }
@@ -175,9 +176,9 @@ command_result get_ip(CommandableIf *t, std::string &ip)
     return command_result::OK;
 }
 
-command_result set_rx_mode(CommandableIf *t, int mode)
+command_result set_rx_mode(CommandableIf *term, int mode)
 {
-    return dce_commands::generic_command(t, "AT+CIPRXGET=" + std::to_string(mode) + "\r", "OK", "ERROR", 5000);
+    return dce_commands::generic_command(term, "AT+CIPRXGET=" + std::to_string(mode) + "\r", "OK", "ERROR", 5000);
 }
 
 

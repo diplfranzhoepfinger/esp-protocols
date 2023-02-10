@@ -36,6 +36,9 @@ private:
     esp_modem::SignalGroup signal;
 
     void close_sock();
+    bool accept_sock();
+    bool sock_to_at();
+    bool at_to_sock();
 
     void forwarding(uint8_t *data, size_t len);
 

@@ -7,4 +7,4 @@ This example demonstrates how to act as a MQTT client using modem's TCP commands
 
 ### Supported IDF versions
 
-This example is only supported from `v4.1`, as this is the default dependency of `esp-modem` component.
+This example is supported from IDF `v4.4`.

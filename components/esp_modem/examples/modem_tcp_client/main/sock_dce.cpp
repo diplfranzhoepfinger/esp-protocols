@@ -13,42 +13,27 @@
 
 namespace sock_dce {
 
-static constexpr char *TAG = "sock_dce";
+constexpr auto const *TAG = "sock_dce";
 
 
 bool DCE::perform()
 {
+    if (listen_sock == -1) {
+        ESP_LOGE(TAG, "Listening socket not ready");
+        close_sock();
+        return false;
+    }
+    if (sock == -1) {   // no active socket, need to accept one first
+        return accept_sock();
+    }
+
+    // we have a socket, let's check the status
     struct timeval tv = {
         .tv_sec = 0,
         .tv_usec = 500000,
     };
     fd_set fdset;
     FD_ZERO(&fdset);
-    if (listen_sock == -1) {
-        ESP_LOGE(TAG, "Listening socket not ready");
-        close_sock();
-        return false;
-    }
-    if (sock == -1) {
-        // need to accept the connection first
-        FD_SET(listen_sock, &fdset);
-        int s = select(listen_sock + 1, &fdset, nullptr, nullptr, &tv);
-        if (s > 0 && FD_ISSET(listen_sock, &fdset)) {
-            struct sockaddr_in source_addr = {};
-            socklen_t addr_len = sizeof(source_addr);
-            sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
-            if (sock < 0) {
-                ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
-                return false;
-            }
-            ESP_LOGD(TAG, "Socket accepted!!!");
-            FD_ZERO(&fdset);
-            return true;
-        } else if (s == 0) {
-            return true;
-        }
-        return false;
-    }
     FD_SET(sock, &fdset);
     FD_SET(data_ready_fd, &fdset);
     int s = select(std::max(sock, data_ready_fd) + 1, &fdset, nullptr, nullptr, &tv);
@@ -60,49 +45,11 @@ bool DCE::perform()
         close_sock();
         return false;
     }
-    if (FD_ISSET(sock, &fdset)) {
-        ESP_LOGD(TAG,  "socket read: data available");
-        if (!signal.wait(IDLE, 1000)) {
-            ESP_LOGE(TAG,  "Failed to get idle");
-            close_sock();
-            return false;
-        }
-        if (state != status::IDLE) {
-            ESP_LOGE(TAG,  "Unexpected state %d", state);
-            close_sock();
-            return false;
-        }
-        state = status::SENDING;
-        int len = ::recv(sock, &buffer[0], size, 0);
-        if (len < 0) {
-            ESP_LOGE(TAG,  "read error %d", errno);
-            close_sock();
-            return false;
-        } else if (len == 0) {
-            ESP_LOGE(TAG,  "EOF %d", errno);
-            close_sock();
-            return false;
-        }
-        ESP_LOG_BUFFER_HEXDUMP(TAG, &buffer[0], len, ESP_LOG_VERBOSE);
-        data_to_send = len;
-        send_cmd("AT+CIPSEND=0," + std::to_string(len) + "\r");
+    if (FD_ISSET(sock, &fdset) && !sock_to_at()) {
+        return false;
     }
-    if (FD_ISSET(data_ready_fd, &fdset)) {
-        uint64_t data;
-        read(data_ready_fd, &data, sizeof(data));
-        ESP_LOGD(TAG, "select read: modem data available %x", data);
-        if (!signal.wait(IDLE, 1000)) {
-            ESP_LOGE(TAG, "Failed to get idle");
-            close_sock();
-            return false;
-        }
-        if (state != status::IDLE) {
-            ESP_LOGE(TAG, "Unexpected state %d", state);
-            close_sock();
-            return false;
-        }
-        state = status::RECEIVING;
-        send_cmd("AT+CIPRXGET=2,0," + std::to_string(size) + "\r");
+    if (FD_ISSET(data_ready_fd, &fdset) && !at_to_sock()) {
+        return false;
     }
     return true;
 }
@@ -260,6 +207,83 @@ void DCE::close_sock()
         close(sock);
         sock = -1;
     }
+}
+
+bool DCE::at_to_sock()
+{
+    uint64_t data;
+    read(data_ready_fd, &data, sizeof(data));
+    ESP_LOGD(TAG, "select read: modem data available %x", data);
+    if (!signal.wait(IDLE, 1000)) {
+        ESP_LOGE(TAG, "Failed to get idle");
+        close_sock();
+        return false;
+    }
+    if (state != status::IDLE) {
+        ESP_LOGE(TAG, "Unexpected state %d", state);
+        close_sock();
+        return false;
+    }
+    state = status::RECEIVING;
+    send_cmd("AT+CIPRXGET=2,0," + std::to_string(size) + "\r");
+    return true;
+}
+
+bool DCE::sock_to_at()
+{
+    ESP_LOGD(TAG,  "socket read: data available");
+    if (!signal.wait(IDLE, 1000)) {
+        ESP_LOGE(TAG,  "Failed to get idle");
+        close_sock();
+        return false;
+    }
+    if (state != status::IDLE) {
+        ESP_LOGE(TAG,  "Unexpected state %d", state);
+        close_sock();
+        return false;
+    }
+    state = status::SENDING;
+    int len = ::recv(sock, &buffer[0], size, 0);
+    if (len < 0) {
+        ESP_LOGE(TAG,  "read error %d", errno);
+        close_sock();
+        return false;
+    } else if (len == 0) {
+        ESP_LOGE(TAG,  "EOF %d", errno);
+        close_sock();
+        return false;
+    }
+    ESP_LOG_BUFFER_HEXDUMP(TAG, &buffer[0], len, ESP_LOG_VERBOSE);
+    data_to_send = len;
+    send_cmd("AT+CIPSEND=0," + std::to_string(len) + "\r");
+    return true;
+}
+
+bool DCE::accept_sock()
+{
+    struct timeval tv = {
+        .tv_sec = 0,
+        .tv_usec = 500000,
+    };
+    fd_set fdset;
+    FD_ZERO(&fdset);
+    FD_SET(listen_sock, &fdset);
+    int s = select(listen_sock + 1, &fdset, nullptr, nullptr, &tv);
+    if (s > 0 && FD_ISSET(listen_sock, &fdset)) {
+        struct sockaddr_in source_addr = {};
+        socklen_t addr_len = sizeof(source_addr);
+        sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
+        if (sock < 0) {
+            ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
+            return false;
+        }
+        ESP_LOGD(TAG, "Socket accepted!");
+        FD_ZERO(&fdset);
+        return true;
+    } else if (s == 0) {
+        return true;
+    }
+    return false;
 }
 
 void DCE::init(int port)

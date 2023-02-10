@@ -22,7 +22,7 @@
 #include "sock_dce.hpp"
 #include "esp_log.h"
 
-#define BROKER_URL "mqtt://mqtt.eclipseprojects.io"
+#define BROKER_URL "mqtt.eclipseprojects.io"
 
 static const char *TAG = "modem_client";
 static EventGroupHandle_t event_group = NULL;
@@ -69,13 +69,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     }
 }
-
-
-
-
-
-
-
 
 extern "C" void app_main(void)
 {
@@ -125,7 +118,7 @@ extern "C" void app_main(void)
     esp_mqtt_client_handle_t mqtt_client = esp_mqtt_client_init(&mqtt_config);
     esp_mqtt_client_register_event(mqtt_client, static_cast<esp_mqtt_event_id_t>(ESP_EVENT_ANY_ID), mqtt_event_handler, NULL);
     esp_mqtt_client_start(mqtt_client);
-    if (!dce->start("mqtt.eclipseprojects.io", 8883)) {
+    if (!dce->start(BROKER_URL, 8883)) {
         ESP_LOGE(TAG, "Failed to start DCE");
         return;
     }

@@ -51,7 +51,7 @@ command_result generic_command(CommandableIf *t, const std::string &command,
     return generic_command(t, command, pass, fail, timeout_ms);
 }
 
-command_result generic_get_string(CommandableIf *t, const std::string &command, std::string_view &output, uint32_t timeout_ms)
+static command_result generic_get_string(CommandableIf *t, const std::string &command, std::string_view &output, uint32_t timeout_ms = 500)
 {
     ESP_LOGV(TAG, "%s", __func__ );
     return t->command(command, [&](uint8_t *data, size_t len) {

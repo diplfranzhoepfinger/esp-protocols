@@ -36,6 +36,9 @@ using namespace esp_modem;
 #define _ARGS(x)  ARGS ## x
 #define ARGS(x)  _ARGS(x)
 
+#define CMD_OK    (1)
+#define CMD_FAIL  (2)
+
 //
 // Repeat all declarations and forward to the AT commands defined in esp_modem::dce_commands:: namespace
 //
@@ -53,25 +56,41 @@ std::unique_ptr<Shiny::DCE> create_shiny_dce(const esp_modem::dce_config *config
     return Shiny::Factory::create(config, std::move(dte), netif);
 }
 
+/**
+ * @brief Definition of the command API, which makes the Shiny::DCE "command-able class"
+ * @param cmd Command to send
+ * @param got_line Recv line callback
+ * @param time_ms timeout in ms
+ * @param separator line break separator
+ * @return OK, FAIL or TIMEOUT
+ */
 command_result Shiny::DCE::command(const std::string &cmd, got_line_cb got_line, uint32_t time_ms, const char separator)
 {
     if (!handling_urc) {
         return dte->command(cmd, got_line, time_ms, separator);
     }
     handle_cmd = got_line;
-    signal.clear(3);
-    dte->write_cmd((uint8_t *)cmd.c_str(), cmd.length());
-    signal.wait_any(3, time_ms);
+    signal.clear(CMD_OK | CMD_FAIL);
+    esp_modem::DTE_Command command{cmd};
+    dte->write(command);
+    signal.wait_any(CMD_OK | CMD_FAIL, time_ms);
     handle_cmd = nullptr;
-    if (signal.is_any(1)) {
+    if (signal.is_any(CMD_OK)) {
         return esp_modem::command_result::OK;
     }
-    if (signal.is_any(2)) {
+    if (signal.is_any(CMD_FAIL)) {
         return esp_modem::command_result::FAIL;
     }
     return esp_modem::command_result::TIMEOUT;
 }
 
+/**
+ * @brief Handle received data
+ *
+ * @param data Data received from the device
+ * @param len Length of the data
+ * @return standard command return code (OK|FAIL|TIMEOUT)
+ */
 command_result Shiny::DCE::handle_data(uint8_t *data, size_t len)
 {
     if (std::memchr(data, '\n', len)) {
@@ -84,10 +103,10 @@ command_result Shiny::DCE::handle_data(uint8_t *data, size_t len)
                 return command_result::TIMEOUT;
             }
             if (ret == esp_modem::command_result::OK) {
-                signal.set(1);
+                signal.set(CMD_OK);
             }
             if (ret == esp_modem::command_result::FAIL) {
-                signal.set(2);
+                signal.set(CMD_FAIL);
             }
         }
     }
